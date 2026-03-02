@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import cv2
 import math
 
-def save_images_to_pdf(image_list, output_filename="registered_results.pdf"):
+def save_images_to_pdf(image_list, scores=None, scores_before=None, pairs_names=None, output_filename="registered_results.pdf"):
     # Create a figure with 4 rows and 3 columns (3x4 grid)
     fig, axes = plt.subplots(4, 3, figsize=(8.27, 11.69)) # A4 size
     axes = axes.flatten()
@@ -18,9 +18,10 @@ def save_images_to_pdf(image_list, output_filename="registered_results.pdf"):
             if len(img.shape) == 3:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             
+            title_text = f"Pair {pairs_names[i]}\nSSIM: {scores_before[i]:.2f} -> {scores[i]:.2f}"
             axes[i].imshow(img, cmap='gray' if len(img.shape) == 2 else None)
             axes[i].axis('off') # Hide axes for clean look
-            axes[i].set_title(f"Pair {i+1}", fontsize=8)
+            axes[i].set_title(title_text, fontsize=8)
         else:
             axes[i].axis('off') # Hide empty cells if fewer than 12
 
@@ -81,6 +82,7 @@ def evaluate_dataset(data_dir):
     files = [f for f in os.listdir(data_dir) if f.endswith('_im_1.png')]
     scores = []
     scores_before = []
+    pairs_names = [] 
     registered_images = []
     for f in files:
         pair_id = f.split('_')[0]
@@ -98,13 +100,14 @@ def evaluate_dataset(data_dir):
         score = ssim(i1, reg_i2)
         scores.append(score)
         scores_before.append(score_before)
+        pairs_names.append(pair_id)
         print(f"Pair {pair_id} SSIM: {score:.4f} (before: {score_before:.4f})")
         
     print(f"\nAverage SSIM Score: {np.mean(scores):.4f}")
     print(f"Average SSIM Score Before Registration: {np.mean(scores_before):.4f}")
 
-    return registered_images
+    return registered_images , scores, scores_before , pairs_names
 
 # הרצה
-registered_images = evaluate_dataset(r'C:\Users\ozsha\Documents\el\data\set1')
-save_images_to_pdf(registered_images[:12])
+registered_images, scores, scores_before, pairs_names = evaluate_dataset(r'C:\Users\ozsha\Documents\el\data\set1')
+save_images_to_pdf(registered_images[:12] , scores[:12], scores_before[:12], pairs_names[:12])
