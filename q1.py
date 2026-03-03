@@ -89,7 +89,7 @@ if uploaded_files:
                 with open(file_path, "rb") as f:
                     f_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
                 raw_img = cv2.imdecode(f_bytes, cv2.IMREAD_GRAYSCALE)
-                
+
                 # 2. החלת ה-Pipeline עם הפרמטרים מה-GUI
                 if st.session_state.prep_mode == "CLAHE":
                     proc_img = apply_clahe(raw_img, st.session_state.c_limit)
@@ -97,25 +97,34 @@ if uploaded_files:
                     proc_img = apply_gaussian(raw_img, st.session_state.g_sigma)
                 else:
                     proc_img = raw_img
-                    
+
                 v_map = get_variance_map(proc_img.astype(np.float32), st.session_state.k_size)
-                batch_mask = (v_map < st.session_state.var_thresh).astype(np.uint8) * 255 # שמירה כבינארי 0/255
-                
+                batch_mask = (v_map < st.session_state.var_thresh).astype(np.uint8) * 255  # 0/255
+
                 if use_morph:
                     kernel_m = np.ones((st.session_state.m_size, st.session_state.m_size), np.uint8)
                     batch_mask = cv2.morphologyEx(batch_mask, cv2.MORPH_CLOSE, kernel_m)
                     batch_mask = cv2.morphologyEx(batch_mask, cv2.MORPH_OPEN, kernel_m)
-                
+
                 # --- יצירת הויזואליזציה (Red/Green Overlay) ---
-                img_bgr = cv2.cvtColor(batch_mask, cv2.COLOR_GRAY2BGR)
+                alpha = st.session_state.get("alpha", 0.4)  # CHANGED: safe default if not set
+
+                # CHANGED: background must be the ORIGINAL image, not the mask
+                img_bgr = cv2.cvtColor(raw_img, cv2.COLOR_GRAY2BGR)
+
                 overlay = img_bgr.copy()
-                
-                # 1 = חלק (ירוק), 0 = מורכב (אדום)
-                overlay[batch_mask == 1] = [0, 180, 0] 
-                overlay[batch_mask == 0] = [180, 0, 0] 
-                
-                final_view = cv2.addWeighted(overlay, st.session_state.alpha,
-                                              img_bgr, 1 - st.session_state.alpha, 0)
+
+                # CHANGED: batch_mask is 0/255, so "smooth" is mask > 0 (NOT == 1)
+                smooth = (batch_mask > 0)
+
+                # CHANGED: OpenCV is BGR. Green=[0,180,0], Red=[0,0,180]
+                overlay[smooth] = [0, 180, 0]     # smooth -> green
+                overlay[~smooth] = [0, 0, 180]    # variable -> red
+
+                final_view = cv2.addWeighted(
+                    overlay, alpha,
+                    img_bgr, 1 - alpha, 0
+                )
 
                 # 3. שמירה לדיסק
                 save_path = os.path.join(out_folder, f"mask_{file_name}")
